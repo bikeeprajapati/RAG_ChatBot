@@ -3,17 +3,11 @@ import numpy as np
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
 
-# ── LOAD TOKEN ────────────────────────────────────────────────────────
 load_dotenv()
 HF_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN")
 
 if not HF_TOKEN:
     raise ValueError("HUGGINGFACEHUB_API_TOKEN missing. Check your .env file.")
-
-# ── CREATE CLIENT ─────────────────────────────────────────────────────
-# InferenceClient is HF's official way to call their API
-# We pass our token so HF knows who we are
-# provider="hf-inference" means: run on HF's own servers (free tier)
 client = InferenceClient(
     provider="hf-inference",
     api_key=HF_TOKEN
@@ -23,18 +17,13 @@ client = InferenceClient(
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 
-# ── CORE FUNCTION ─────────────────────────────────────────────────────
+#CORE FUNCTION 
 def embed_chunks(chunks: list[str]) -> np.ndarray:
     """
     Input:  list of text strings
     Output: numpy array of shape (num_chunks, 384)
             each row = one chunk encoded as 384 numbers
     """
-    print(f"\n📤 Sending {len(chunks)} chunks to HF API...")
-
-    # feature_extraction() is HF's method for getting embeddings
-    # It sends your text to their server and returns vectors back
-    # This replaces our manual requests.post() — cleaner and future-proof
     embeddings = client.feature_extraction(
         text=chunks,
         model=EMBEDDING_MODEL
@@ -42,12 +31,10 @@ def embed_chunks(chunks: list[str]) -> np.ndarray:
 
     # Convert to numpy array for fast math operations later
     embeddings = np.array(embeddings)
-
-    print(f"✓ Got back {embeddings.shape[0]} vectors, {embeddings.shape[1]} numbers each")
     return embeddings
 
 
-# ── SIMILARITY HELPER ─────────────────────────────────────────────────
+#SIMILARITY HELPER 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     """
     How similar are two vectors in meaning?
@@ -60,7 +47,7 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
 
-# ── TEST ──────────────────────────────────────────────────────────────
+# TEST 
 if __name__ == "__main__":
     import sys
     sys.path.append("..")
