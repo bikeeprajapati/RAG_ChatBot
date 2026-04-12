@@ -1,92 +1,54 @@
 import os
 import logging
+from openai import OpenAI
 from dotenv import load_dotenv
-from huggingface_hub import InferenceClient
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s — %(message)s")
 logger = logging.getLogger(__name__)
 
-#  CONSTANTS 
-LLM_MODEL   = "mistralai/Mistral-7B-Instruct-v0.3"
-# Mistral-7B: powerful open-source LLM, free on HF inference API
-# "Instruct" version = fine-tuned to follow instructions and answer questions
-# This is what reads your context and generates the final answer
+# ── CONSTANTS ─────────────────────────────────────────────────────────
+LLM_MODEL      = "katanemo/Arch-Router-1.5B:hf-inference"
+# katanemo/Arch-Router-1.5B — small instruction-tuned model
+# Works on HF free tier — no GPU, no cost for light usage
+# ":hf-inference" tells the router which provider to use
 
-MAX_TOKENS  = 512
-# Maximum length of the generated answer
-# 512 tokens ≈ ~380 words — enough for a detailed answer
+MAX_NEW_TOKENS = 512
+# Max tokens the LLM can generate in one response
+# 512 ≈ 380 words — enough for a detailed answer
 
-TEMPERATURE = 0.3
-# Controls randomness in generation
-# 0.0 = deterministic, always same answer
-# 1.0 = very creative, unpredictable
-# 0.3 = mostly factual with slight natural variation — good for Q&A
+TEMPERATURE    = 0.2
+# How creative/random the answer is
+# 0.2 = mostly factual, stays close to context — right for Q&A
 
 
-#  SETUP 
+# ── SETUP ─────────────────────────────────────────────────────────────
 load_dotenv()
-HF_TOKEN = os.getenv("HF_TOKEN")
+# Reads .env file and loads HF_TOKEN into memory
 
+HF_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN")
 if not HF_TOKEN:
-    raise ValueError("HF_TOKEN missing. Add it to your .env file.")
+    raise ValueError("HUGGINGFACEHUB_API_TOKEN missing. Add it to your .env file.")
 
-# Same InferenceClient as embedder but now we use it for text generation
-# Created once at module level — not inside functions
-client = InferenceClient(
-    provider="hf-inference",
+# We use OpenAI client pointing at HF's router endpoint
+# HF router is OpenAI-compatible — same interface, HF models
+# This is the correct way to call LLMs on HF free tier in 2025+
+client = OpenAI(
+    base_url="https://router.huggingface.co/v1",
     api_key=HF_TOKEN
 )
 
 
-#  PROMPT BUILDER   
-def build_prompt(question: str, context_chunks: list[str]) -> str:
-    """
-    Assembles the final prompt sent to the LLM.
-
-    RAG prompt structure — always three parts:
-    1. System instruction — tell the LLM its role and rules
-    2. Context          — the retrieved chunks from your document
-    3. Question         — what the user actually asked
-
-    Why this order: LLMs perform better when they read the
-    context BEFORE the question — they know what to look for.
-    """
-
-    # Join chunks with clear separators so LLM sees them as distinct sources
-    context = "\n\n".join(
-        f"[Source {i+1}]:\n{chunk.strip()}"
-        for i, chunk in enumerate(context_chunks)
-    )
-
-    # This is a standard RAG prompt template
-    # "Only use the context below" = prevents hallucination
-    # The LLM won't invent facts — it sticks to your document
-    prompt = f"""You are a helpful assistant that answers questions about Bikee Prajapati's resume.
-Use ONLY the context provided below to answer the question.
-If the answer is not in the context, say "I don't have that information in the resume."
-Do not make up or assume any information.
-
-Context:
-{context}
-
-Question: {question}
-
-Answer:"""
-
-    return prompt
-
-
-#  CORE FUNCTION        
+# ── CORE FUNCTION ─────────────────────────────────────────────────────
 def generate_answer(question: str, context_chunks: list[str]) -> str:
     """
-    Generates a grounded answer using retrieved context.
+    Generates a grounded answer from question + retrieved context.
 
     Args:
-        question:       Raw question from the user
-        context_chunks: Retrieved chunks from vector store
+        question:       Raw question string from the user
+        context_chunks: List of relevant text chunks from vector store
 
     Returns:
-        Generated answer string
+        Generated answer as a plain string
     """
 
     if not question.strip():
@@ -95,22 +57,49 @@ def generate_answer(question: str, context_chunks: list[str]) -> str:
     if not context_chunks:
         raise ValueError("No context chunks provided.")
 
-    prompt = build_prompt(question, context_chunks)
-    logger.info(f"Sending prompt to {LLM_MODEL}...")
-
-    response = client.text_generation(
-        prompt,
-        model=MAX_TOKENS,
-        max_new_tokens=MAX_TOKENS,
-        temperature=TEMPERATURE,
-        do_sample=True,
-        # do_sample=True → use temperature-based sampling
-        # do_sample=False → always pick highest probability token (greedy)
-        # We use True so answers feel natural, not robotic
+    # Number each chunk so LLM treats them as separate sources
+    # This helps the LLM reason across multiple passages
+    context = "\n\n".join(
+        f"[Source {i+1}]:\n{chunk.strip()}"
+        for i, chunk in enumerate(context_chunks)
     )
 
-    answer = response.strip()
-    logger.info(f"Generated answer ({len(answer)} chars)")
+    logger.info(f"Sending to LLM: '{question}'")
+
+    # chat.completions.create() is the standard modern LLM interface
+    # Same format as OpenAI — two roles:
+    # "system" → instructions the LLM must follow
+    # "user"   → the actual input (context + question)
+    response = client.chat.completions.create(
+        model=LLM_MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are a helpful assistant that answers questions "
+                    "strictly based on the provided resume context. "
+                    "If the answer is not in the context, say: "
+                    "'I don't have that information in the resume.' "
+                    "Never make up or assume anything not in the context. "
+                    "Be concise and direct."
+                )
+            },
+            {
+                "role": "user",
+                "content": f"Context:\n{context}\n\nQuestion: {question}"
+            }
+        ],
+        max_tokens=MAX_NEW_TOKENS,
+        temperature=TEMPERATURE,
+    )
+    # response structure (OpenAI format):
+    # response.choices        → list of generated responses (we asked for 1)
+    # response.choices[0]     → first response
+    # .message                → the message object
+    # .content                → the actual text string
+
+    answer = response.choices[0].message.content.strip()
+    logger.info(f"Answer generated — {len(answer)} chars")
     return answer
 
 
@@ -119,15 +108,24 @@ if __name__ == "__main__":
     import sys
     sys.path.append("..")
 
-    from chunking import load_pdf, chunk_text
-    from embedder import embed_chunks
-    from vector_store import load_vector_store, search
+    from retriever import retrieve
 
-    index, chunks = load_vector_store()
+    # Test with 3 different questions
+    # Each hits a different part of the resume
+    test_questions = [
+        "What programming languages does Bikee know?",
+        "What projects has Bikee built?",
+        "What is Bikee's educational background?",
+    ]
 
-    question        = "What programming languages does Bikee know?"
-    question_vector = embed_chunks([question])[0]
-    context_chunks  = search(question_vector, index, chunks)
+    for question in test_questions:
+        print(f"\n{'='*55}")
+        print(f"Q: {question}")
+        print("="*55)
 
-    print(f"\nQ: {question}")
-    print(f"\nA: {generate_answer(question, context_chunks)}")
+        context_chunks = retrieve(question)
+
+        print("⏳ Generating answer...")
+        answer = generate_answer(question, context_chunks)
+
+        print(f"A: {answer}")
