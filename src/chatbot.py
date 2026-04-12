@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 logging.basicConfig(level=logging.INFO, format="%(asctime)s — %(message)s")
 logger = logging.getLogger(__name__)
 
-# ── CONSTANTS ─────────────────────────────────────────────────────────
+#  CONSTANTS 
 LLM_MODEL      = "katanemo/Arch-Router-1.5B:hf-inference"
 # katanemo/Arch-Router-1.5B — small instruction-tuned model
 # Works on HF free tier — no GPU, no cost for light usage
@@ -21,9 +21,9 @@ TEMPERATURE    = 0.2
 # 0.2 = mostly factual, stays close to context — right for Q&A
 
 
-# ── SETUP ─────────────────────────────────────────────────────────────
+#  SETUP 
 load_dotenv()
-# Reads .env file and loads HF_TOKEN into memory
+# Reads .env file and loads HUGGINGFACEHUB_API_TOKEN into memory
 
 HF_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN")
 if not HF_TOKEN:
@@ -38,7 +38,7 @@ client = OpenAI(
 )
 
 
-# ── CORE FUNCTION ─────────────────────────────────────────────────────
+#  CORE FUNCTION  
 def generate_answer(question: str, context_chunks: list[str]) -> str:
     """
     Generates a grounded answer from question + retrieved context.
