@@ -8,3 +8,7 @@ python-dotenv
 requests
 numpy
 huggingface-hub
+fastapi
+uvicorn
+python-multipart
+openai
