@@ -1,3 +1,12 @@
+# src/chatbot.py
+# ─────────────────────────────────────────────────────────────────────
+# RESPONSIBILITY: Generate a grounded answer from question + context.
+# Now supports conversation history — understands follow-up questions.
+#
+# Input:  question (str) + context_chunks (list[str]) + history (list)
+# Output: answer (str)
+# ─────────────────────────────────────────────────────────────────────
+
 import os
 import logging
 from openai import OpenAI
@@ -6,46 +15,44 @@ from dotenv import load_dotenv
 logging.basicConfig(level=logging.INFO, format="%(asctime)s — %(message)s")
 logger = logging.getLogger(__name__)
 
-#  CONSTANTS 
+# ── CONSTANTS ─────────────────────────────────────────────────────────
 LLM_MODEL      = "katanemo/Arch-Router-1.5B:hf-inference"
-# katanemo/Arch-Router-1.5B — small instruction-tuned model
-# Works on HF free tier — no GPU, no cost for light usage
-# ":hf-inference" tells the router which provider to use
-
 MAX_NEW_TOKENS = 512
-# Max tokens the LLM can generate in one response
-# 512 ≈ 380 words — enough for a detailed answer
-
-TEMPERATURE    = 0.2
-# How creative/random the answer is
-# 0.2 = mostly factual, stays close to context — right for Q&A
+TEMPERATURE    = 0.0
+# 0.0 = fully deterministic — no creativity, pure factual mode
+# Right choice for document Q&A where accuracy matters most
 
 
-#  SETUP 
+# ── SETUP ─────────────────────────────────────────────────────────────
 load_dotenv()
-# Reads .env file and loads HUGGINGFACEHUB_API_TOKEN into memory
+HF_TOKEN = os.getenv("HUGGINGFACE_API_TOKEN")
 
-HF_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN")
 if not HF_TOKEN:
-    raise ValueError("HUGGINGFACEHUB_API_TOKEN missing. Add it to your .env file.")
+    raise ValueError("HF_TOKEN missing. Add it to your .env file.")
 
-# We use OpenAI client pointing at HF's router endpoint
-# HF router is OpenAI-compatible — same interface, HF models
-# This is the correct way to call LLMs on HF free tier in 2025+
+# OpenAI client pointing at HF's router
+# HF router is OpenAI-compatible — same interface, free tier models
 client = OpenAI(
     base_url="https://router.huggingface.co/v1",
     api_key=HF_TOKEN
 )
 
 
-#  CORE FUNCTION  
-def generate_answer(question: str, context_chunks: list[str]) -> str:
+# ── CORE FUNCTION ─────────────────────────────────────────────────────
+def generate_answer(
+    question: str,
+    context_chunks: list[str],
+    history: list[dict] = []
+) -> str:
     """
-    Generates a grounded answer from question + retrieved context.
+    Generates a grounded answer from question + context + conversation history.
 
     Args:
         question:       Raw question string from the user
-        context_chunks: List of relevant text chunks from vector store
+        context_chunks: Retrieved chunks from vector store
+        history:        Previous conversation messages
+                        Format: [{"role": "user", "content": "..."},
+                                 {"role": "assistant", "content": "..."}]
 
     Returns:
         Generated answer as a plain string
@@ -58,74 +65,77 @@ def generate_answer(question: str, context_chunks: list[str]) -> str:
         raise ValueError("No context chunks provided.")
 
     # Number each chunk so LLM treats them as separate sources
-    # This helps the LLM reason across multiple passages
     context = "\n\n".join(
         f"[Source {i+1}]:\n{chunk.strip()}"
         for i, chunk in enumerate(context_chunks)
     )
 
-    logger.info(f"Sending to LLM: '{question}'")
+    logger.info(f"Sending to LLM: '{question}' | history: {len(history)} messages")
 
-    # chat.completions.create() is the standard modern LLM interface
-    # Same format as OpenAI — two roles:
-    # "system" → instructions the LLM must follow
-    # "user"   → the actual input (context + question)
+    # ── BUILD MESSAGES ────────────────────────────────────────────────
+    # message order always:
+    # 1. system  → rules + context
+    # 2. history → previous exchanges (gives memory)
+    # 3. user    → current question
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a document assistant. Your ONLY job is to answer "
+                "questions using the exact information provided in the context below."
+                "\n\nSTRICT RULES:"
+                "\n- ONLY use facts that are explicitly stated in the context"
+                "\n- If the context does not contain the answer, respond with exactly: "
+                "'The document does not contain information about this.'"
+                "\n- Do NOT use your own knowledge"
+                "\n- Do NOT make assumptions or inferences beyond what is written"
+                "\n- Do NOT say things like 'likely', 'probably', or 'typically'"
+                "\n- For follow-up questions like 'more', 'continue', or 'tell me more', "
+                "expand on your previous answer using only the context"
+                "\n- Be concise and direct"
+                f"\n\nContext:\n{context}"
+            )
+        }
+    ]
+
+    # Append conversation history
+    # This is what makes follow-up questions work
+    # The LLM can see what was asked and answered before
+    for msg in history:
+        messages.append(msg)
+
+    # Append current question as the final user message
+    messages.append({"role": "user", "content": question})
+
     response = client.chat.completions.create(
         model=LLM_MODEL,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are a helpful assistant that answers questions "
-                    "strictly based on the provided resume context. "
-                    "If the answer is not in the context, say: "
-                    "'I don't have that information in the resume.' "
-                    "Never make up or assume anything not in the context. "
-                    "Be concise and direct."
-                )
-            },
-            {
-                "role": "user",
-                "content": f"Context:\n{context}\n\nQuestion: {question}"
-            }
-        ],
+        messages=messages,
         max_tokens=MAX_NEW_TOKENS,
         temperature=TEMPERATURE,
     )
-    # response structure (OpenAI format):
-    # response.choices        → list of generated responses (we asked for 1)
-    # response.choices[0]     → first response
-    # .message                → the message object
-    # .content                → the actual text string
 
     answer = response.choices[0].message.content.strip()
     logger.info(f"Answer generated — {len(answer)} chars")
     return answer
 
 
-#  ENTRY POINT 
+# ── ENTRY POINT ───────────────────────────────────────────────────────
 if __name__ == "__main__":
     import sys
     sys.path.append("..")
 
     from retriever import retrieve
 
-    # Test with 3 different questions
-    # Each hits a different part of the resume
-    test_questions = [
-        "What programming languages does Bikee know?",
-        "What projects has Bikee built?",
-        "What is Bikee's educational background?",
+    # Test conversation with follow-up
+    questions = [
+        ("What projects has Bikee built?", []),
     ]
 
-    for question in test_questions:
-        print(f"\n{'='*55}")
-        print(f"Q: {question}")
-        print("="*55)
-
-        context_chunks = retrieve(question)
-
-        print("⏳ Generating answer...")
-        answer = generate_answer(question, context_chunks)
-
+    history = []
+    for question, _ in questions:
+        print(f"\nQ: {question}")
+        chunks = retrieve(question)
+        answer = generate_answer(question, chunks, history)
         print(f"A: {answer}")
+        history.append({"role": "user",      "content": question})
+        history.append({"role": "assistant", "content": answer})

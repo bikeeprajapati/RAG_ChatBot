@@ -8,7 +8,7 @@ def load_pdf(path: str) -> str:
     doc = fitz.open(path)
     return "".join(page.get_text() for page in doc)
 
-def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> list[str]:
+def chunk_text(text: str, chunk_size: int = 300, overlap: int = 100) -> list[str]:
     """
     Split text into overlapping chunks.
     chunk_size: characters per chunk

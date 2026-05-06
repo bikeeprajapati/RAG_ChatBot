@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
 
 load_dotenv()
-HF_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN")
+HF_TOKEN = os.getenv("HUGGINGFACE_API_TOKEN")
 
 if not HF_TOKEN:
     raise ValueError("HUGGINGFACEHUB_API_TOKEN missing. Check your .env file.")
