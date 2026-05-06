@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+data/index.faiss
+data/chunks.pkl
+data/uploaded.pdf
+.git/
+*.md
