@@ -1,9 +1,3 @@
-// app.js
-// ─────────────────────────────────────────────────────────────────────
-// RESPONSIBILITY: Handle all user interactions and API communication.
-// Tracks conversation history so follow-up questions work correctly.
-// ─────────────────────────────────────────────────────────────────────
-
 // ── DOM REFERENCES ────────────────────────────────────────────────────
 const chatWindow       = document.getElementById("chatWindow");
 const questionInput    = document.getElementById("questionInput");

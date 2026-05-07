@@ -1,5 +1,3 @@
-# src/chatbot.py
-# ─────────────────────────────────────────────────────────────────────
 # RESPONSIBILITY: Generate a grounded answer from question + context.
 # Now supports conversation history — understands follow-up questions.
 #
