@@ -7,7 +7,7 @@ load_dotenv()
 HF_TOKEN = os.getenv("HUGGINGFACE_API_TOKEN")
 
 if not HF_TOKEN:
-    raise ValueError("HUGGINGFACEHUB_API_TOKEN missing. Check your .env file.")
+    raise ValueError("HUGGINGFACE_API_TOKEN missing. Check your .env file.")
 client = InferenceClient(
     provider="hf-inference",
     api_key=HF_TOKEN
