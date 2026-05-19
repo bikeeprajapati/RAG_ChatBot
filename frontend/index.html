@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocMind — Chat with your PDF</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- Background grain texture -->
+<div class="grain"></div>
+
+<!-- Ambient glow orbs -->
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+
+<div class="app">
+
+<!-- ── HEADER ── -->
+<header class="header">
+    <div class="header-left">
+    <div class="logo">
+        <span class="logo-mark">◈</span>
+        <span class="logo-text">DocMind</span>
+    </div>
+    <div class="header-divider"></div>
+    <span class="header-tag">RAG · Powered by HuggingFace</span>
+    </div>
+    <div class="status-pill" id="statusPill">
+    <span class="status-dot"></span>
+    <span class="status-text">No document loaded</span>
+    </div>
+</header>
+
+<!-- ── MAIN LAYOUT ── -->
+<main class="layout">
+
+    <!-- ── LEFT: UPLOAD PANEL ── -->
+    <aside class="panel upload-panel">
+    <div class="panel-label">DOCUMENT</div>
+
+    <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept=".pdf" hidden>
+
+        <div class="upload-idle" id="uploadIdle">
+        <div class="upload-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <line x1="9" y1="15" x2="15" y2="15"/>
+            </svg>
+        </div>
+        <p class="upload-title">Drop your PDF here</p>
+        <p class="upload-sub">or <button class="upload-browse" onclick="document.getElementById('fileInput').click()">browse files</button></p>
+        </div>
+
+        <div class="upload-processing" id="uploadProcessing" style="display:none">
+        <div class="spinner"></div>
+        <p class="upload-title">Processing document<span class="ellipsis"></span></p>
+        <p class="upload-sub" id="processingStep">Extracting text</p>
+        </div>
+
+        <div class="upload-done" id="uploadDone" style="display:none">
+        <div class="done-icon">✓</div>
+        <p class="upload-title" id="fileName">document.pdf</p>
+        <p class="upload-sub" id="chunkCount">— chunks indexed</p>
+        <button class="replace-btn" onclick="resetUpload()">Replace document</button>
+        </div>
+    </div>
+
+    <!-- Info cards -->
+    <div class="info-cards">
+        <div class="info-card">
+        <span class="info-card-label">Model</span>
+        <span class="info-card-value">MiniLM-L6</span>
+        </div>
+        <div class="info-card">
+        <span class="info-card-label">LLM</span>
+        <span class="info-card-value">Mistral 1.5B</span>
+        </div>
+        <div class="info-card">
+        <span class="info-card-label">Store</span>
+        <span class="info-card-value">FAISS</span>
+        </div>
+    </div>
+
+    <div class="panel-footer">
+        Built with <span class="accent">Python · FastAPI · RAG</span>
+    </div>
+    </aside>
+
+    <!-- ── RIGHT: CHAT PANEL ── -->
+    <section class="panel chat-panel">
+    <div class="panel-label">CONVERSATION</div>
+
+    <!-- Messages -->
+    <div class="chat-window" id="chatWindow">
+        <div class="welcome-state" id="welcomeState">
+        <p class="welcome-title">Ready to explore your document</p>
+        <p class="welcome-sub">Upload a PDF on the left to begin asking questions</p>
+        <div class="suggested-questions" id="suggestedQuestions" style="display:none">
+            <p class="sq-label">Try asking</p>
+            <button class="sq-btn" onclick="fillQuestion(this)">What is this document about?</button>
+            <button class="sq-btn" onclick="fillQuestion(this)">Summarize the key points</button>
+            <button class="sq-btn" onclick="fillQuestion(this)">What are the main findings?</button>
+        </div>
+        </div>
+    </div>
+
+    <!-- Input area -->
+    <div class="input-area">
+        <div class="input-wrapper">
+        <textarea
+            id="questionInput"
+            class="question-input"
+            placeholder="Ask anything about your document..."
+            rows="1"
+            disabled
+        ></textarea>
+        <button class="send-btn" id="sendBtn" onclick="sendQuestion()" disabled>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+        </button>
+        </div>
+        <p class="input-hint">Press <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for new line</p>
+    </div>
+
+    </section>
+</main>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

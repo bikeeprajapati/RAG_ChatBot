@@ -1,11 +1,12 @@
 ---
-title: Docmind Pdf Chatbot
-emoji: 📉
-colorFrom: pink
-colorTo: indigo
+title: DocMind PDF Chatbot
+emoji: 📄
+colorFrom: blue
+colorTo: purple
 sdk: docker
+app_port: 7860
 pinned: false
-license: mit
 ---
 
-Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
+# DocMind — Chat with Any PDF
+A RAG chatbot that lets you upload any PDF and have an intelligent conversation with it.
