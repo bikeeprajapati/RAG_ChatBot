@@ -13,7 +13,8 @@ A production-ready RAG (Retrieval-Augmented Generation) chatbot that lets you up
 
 ## Live Demo
 
-> Coming soon — deploying on Render
+## Live Demo
+> 🚀 [Try it live on HuggingFace Spaces](https://vickypy-docmind-pdf-chatbot.hf.space)
 
 ---
 
