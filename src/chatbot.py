@@ -14,25 +14,27 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s — %(message)s")
 logger = logging.getLogger(__name__)
 
 # ── CONSTANTS ─────────────────────────────────────────────────────────
-LLM_MODEL      = "katanemo/Arch-Router-1.5B:hf-inference"
-MAX_NEW_TOKENS = 512
-TEMPERATURE    = 0.0
 # 0.0 = fully deterministic — no creativity, pure factual mode
 # Right choice for document Q&A where accuracy matters most
-
+LLM_MODEL = "llama-3.3-70b-versatile"
+MAX_NEW_TOKENS = 512
+TEMPERATURE    = 0.0
 
 # ── SETUP ─────────────────────────────────────────────────────────────
 load_dotenv()
 HF_TOKEN = os.getenv("HUGGINGFACE_API_TOKEN")
+GROQ_KEY = os.getenv("GROQ_API_KEY")
 
 if not HF_TOKEN:
     raise ValueError("HF_TOKEN missing. Add it to your .env file.")
+if not GROQ_KEY:
+    raise ValueError("GROQ_API_KEY missing. Add it to your .env file.")
 
-# OpenAI client pointing at HF's router
-# HF router is OpenAI-compatible — same interface, free tier models
+# OpenAI client pointing at Groq
+# Groq is OpenAI-compatible — same interface, fast inference
 client = OpenAI(
-    base_url="https://router.huggingface.co/v1",
-    api_key=HF_TOKEN
+    base_url="https://api.groq.com/openai/v1",
+    api_key=GROQ_KEY
 )
 
 
@@ -40,7 +42,7 @@ client = OpenAI(
 def generate_answer(
     question: str,
     context_chunks: list[str],
-    history: list[dict] = []
+    history: list[dict] | None = None
 ) -> str:
     """
     Generates a grounded answer from question + context + conversation history.
@@ -67,6 +69,9 @@ def generate_answer(
         f"[Source {i+1}]:\n{chunk.strip()}"
         for i, chunk in enumerate(context_chunks)
     )
+
+    if history is None:
+        history = []
 
     logger.info(f"Sending to LLM: '{question}' | history: {len(history)} messages")
 

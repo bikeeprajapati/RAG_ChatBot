@@ -17,6 +17,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from pydantic import Field
 
 sys.path.append("src")
 
@@ -58,7 +59,7 @@ rag_state = {
 # ── REQUEST / RESPONSE MODELS ─────────────────────────────────────────
 class QuestionRequest(BaseModel):
     question: str
-    history:  list[dict] = []
+    history:  list[dict] = Field(default_factory=list)
     # history is optional — defaults to empty list
     # Each item: {"role": "user" | "assistant", "content": "..."}
     # Pydantic validates this automatically — no manual parsing needed
